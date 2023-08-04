@@ -1,0 +1,20 @@
+#-----------------------------------------------------------
+#-----------------------------------------------------------
+#----- all samples that are currently available ------------
+#-----------------------------------------------------------
+#
+#-----------------------------------------------------------
+#----------------- data samples ----------------------------
+# BLOCK    COLOR          NAME                 LABEL          LOCATION OF FRIENDS                                          XSEC     ISDATA
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Data       r.kBlack       Run2022B             Data           /ceph/cms/store/user/evourlio/Run3ScoutingOutput/looperOutput_20230722_10Percent/output_DataB_2022_*.root            1        1
+Data       r.kBlack       Run2022C             Data           /ceph/cms/store/user/evourlio/Run3ScoutingOutput/looperOutput_20230722_10Percent/output_DataC_2022_*.root            1        1
+Data       r.kBlack       Run2022D             Data           /ceph/cms/store/user/evourlio/Run3ScoutingOutput/looperOutput_20230722_10Percent/output_DataD_2022_*.root            1        1
+Data       r.kBlack       Run2022E             Data           /ceph/cms/store/user/evourlio/Run3ScoutingOutput/looperOutput_20230722_10Percent/output_DataE_2022_*.root            1        1
+Data       r.kBlack       Run2022F             Data           /ceph/cms/store/user/evourlio/Run3ScoutingOutput/looperOutput_20230722_10Percent/output_DataF_2022_*.root            1        1
+Data       r.kBlack       Run2022G             Data           /ceph/cms/store/user/evourlio/Run3ScoutingOutput/looperOutput_20230722_10Percent/output_DataG_2022_*.root            1        1
+#
+#----------------- monte carlo -----------------------------
+#-----------------------------------------------------------
+# BLOCK       COLOR                            NAME                        LABEL                             LOCATION OF FRIENDS                              XSEC (fb^{-1})     ISDATA
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
