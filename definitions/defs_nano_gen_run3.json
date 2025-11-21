@@ -1,0 +1,5 @@
+{
+    "definitions" : [
+        ["GenJPsi_pt", "GenPart_pt[GenPart_pdgId == 443]"]
+    ]
+}

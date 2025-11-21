@@ -1,0 +1,15 @@
+{
+    "definitions" : [
+        ["Dimuon_idxs", "MakeDimuonVertices(Muon_bestAssocSVOverlapIdx, Muon_bestAssocSVIdx, Muon_ch)"],
+        ["Dimuon_number", "Dimuon_idxs.size()"],
+        ["nDimuon", "Dimuon_number/2"],
+        ["Dimuon_idx1", "ROOT::RVec<int> idx1; for (int i = 0; i < Dimuon_idxs.size(); i = i + 2) idx1.push_back(Dimuon_idxs.at(i)); return idx1;"],
+        ["Dimuon_idx2", "ROOT::RVec<int> idx2; for (int i = 0; i < Dimuon_idxs.size(); i = i + 2) idx2.push_back(Dimuon_idxs.at(i+1)); return idx2;"],
+        ["Dimuon_SVidx", "GetElements<int>(Muon_bestAssocSVIdx, Dimuon_idx1)"],
+        ["Dimuon_SV_chi2", "GetElements<int>(SV_chi2, Dimuon_SVidx)"],
+        ["Dimuon_pixLayers1", "GetElements<unsigned int>(Muon_pixLayers, Dimuon_idx1)"],
+        ["Dimuon_pixLayers2", "GetElements<unsigned int>(Muon_pixLayers, Dimuon_idx2)"],
+        ["Dimuon_vec", "ROOT::RVec<TLorentzVector> v ; for (int i = 0; i < nDimuon; i++) v.push_back(Muon_vec[Dimuon_idx1[i]] + Muon_vec[Dimuon_idx2[i]]); return v;"],
+        ["Dimuon_mass", "GetVectorMass(Dimuon_vec)"]
+    ]
+}

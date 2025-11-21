@@ -1,0 +1,7 @@
+{
+    "definitions" : [
+        ["DiMuon_predPhi", "Muon_phi[0] - Muon_phi[1]"],
+        ["DiMuon_dPhi", "DiMuon_predPhi - 3.141592 * (1 + (DiMuon_predPhi-3.141592)/std::abs(DiMuon_predPhi-3.141592))"],
+        ["DiMuon_mass", "sqrt(2*Muon_pt[0]*Muon_pt[1]*(cosh(Muon_eta[0] - Muon_eta[1]) - cos(Muon_phi[0] - Muon_phi[1])))"]
+    ]
+}

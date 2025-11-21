@@ -25,7 +25,7 @@ class Sample:
       self.ftpaths = []
       self.ftfiles = []
       self.ttrees = []
-      self.tchain = r.TChain('tout')
+      self.tchain = r.TChain('Events')
       self.count = 0.0
 
       ## Load samples
