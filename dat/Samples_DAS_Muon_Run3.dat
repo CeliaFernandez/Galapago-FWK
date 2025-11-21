@@ -13,14 +13,14 @@
 #----------------- data samples ----------------------------
 # BLOCK    COLOR          NAME                        LABEL       LOCATION (DAS dataset)                                           XSEC     ISDATA
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Data       r.kBlack       Muon0_Run2023C              Data        /Muon0/Run2023C-PromptNanoAODv12-v1/NANOAOD                      1        1
-Data       r.kBlack       Muon0_Run2023D              Data        /Muon0/Run2023D-PromptNanoAODv12-v1/NANOAOD                      1        1
+Data       r.kBlack       Muon0_Run2024I_v1              Data        /Muon0/Run2024I-MINIv6NANOv15-v1/NANOAOD                      1        1
+Data       r.kBlack       Muon0_Run2024I_v2              Data        /Muon0/Run2024I-MINIv6NANOv15-v2/NANOAOD                      1        1
 #
 #----------------- monte carlo -----------------------------
 #-----------------------------------------------------------
 # BLOCK       COLOR                            NAME                        LABEL                             LOCATION (DAS dataset)                                                              XSEC (fb)     ISDATA
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-DYJets        r.TColor.GetColor('#f18f01')     DYJetsToLL_M-50             Z/#gamma*#rightarrowl#bar{l}      /DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/Run3Summer23NanoAODv12-130X_mcRun3_2023_realistic_v14-v2/NANOAODSIM     6077220     0
+DYJets        '#f18f01'                        DYJetsToLL_M-50             Drell-Yan      /DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v6/NANOAODSIM     6077220     0
 #
 #----------------- alternative MC --------------------------
 # Uncomment if needed

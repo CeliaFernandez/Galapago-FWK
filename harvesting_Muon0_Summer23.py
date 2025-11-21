@@ -137,7 +137,7 @@ def main():
 
     # Sample configuration
     datfile = WORKPATH + args.dat
-    data_samples = ['Muon0_Run2023C']
+    data_samples = ['Muon0_Run2024I_v1']
     mc_samples = ['DYJetsToLL_M-50']
 
     # Variable definitions for dimuon mass calculation
