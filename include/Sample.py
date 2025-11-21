@@ -6,6 +6,67 @@ import os
 import __main__
 import json
 import glob
+import subprocess
+import hashlib
+
+# XRootD redirector for CMS data access
+XROOTD_REDIRECTOR = "root://cms-xrd-global.cern.ch/"
+
+def queryDAS(dataset, limit=0):
+    """
+    Query CMS DAS for files in a dataset.
+
+    Args:
+        dataset: DAS dataset name (e.g., '/Muon0/Run2023C-PromptNanoAODv12-v1/NANOAOD')
+        limit: Maximum number of files to return (0 = all)
+
+    Returns:
+        List of xrootd file paths
+    """
+    query = f"file dataset={dataset}"
+    cmd = ["dasgoclient", "--query", query]
+    if limit > 0:
+        cmd.extend(["--limit", str(limit)])
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        files = [f for f in result.stdout.strip().split('\n') if f]
+        # Convert LFN to xrootd URL
+        xrootd_files = [XROOTD_REDIRECTOR + f for f in files]
+        print(f"DAS query returned {len(xrootd_files)} files for {dataset}")
+        return xrootd_files
+    except subprocess.CalledProcessError as e:
+        print(f"DAS query failed: {e.stderr}")
+        return []
+    except FileNotFoundError:
+        print("ERROR: dasgoclient not found. Please setup CMS environment (cmsenv)")
+        return []
+
+
+def getCachedDASFiles(dataset, cache_dir=".das_cache"):
+    """
+    Get DAS files with local caching to avoid repeated queries.
+    """
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_key = hashlib.md5(dataset.encode()).hexdigest()
+    cache_file = os.path.join(cache_dir, f"{cache_key}.txt")
+
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            files = [line.strip() for line in f if line.strip()]
+            print(f"Using cached DAS query for {dataset} ({len(files)} files)")
+            return files
+
+    files = queryDAS(dataset)
+    if files:
+        with open(cache_file, 'w') as f:
+            f.write('\n'.join(files))
+    return files
+
+
+def isDASDataset(location):
+    """Check if location is a DAS dataset path."""
+    return location.startswith('/') and location.count('/') >= 3 and '/store/' not in location
 
 ########################################################################################
 ########################################################################################
@@ -14,37 +75,29 @@ import glob
 ########################################################################################
 class Sample:
    'Common base class for all Samples'
-   def __init__(self, name, label, color, location, xsection, isdata):
+   def __init__(self, name, label, color, location, xsection, isdata, file_limit=0):
 
       self.name = name
       self.label = label
-      self.color = eval(color)
-      self.location = location if location[-1] == '/' else location + '/'
+      self.color = eval(color) if isinstance(color, str) else color
+      self.location = location
       self.xSection = xsection
       self.isData = isdata
       self.ftpaths = []
-      self.ftfiles = []
-      self.ttrees = []
       self.tchain = r.TChain('Events')
       self.count = 0.0
 
-      ## Load samples
-      if '*' in location:
-        for file in glob.glob(location):
-          if '.root' not in file: continue
-          self.ftpaths.append(file)
-          self.tchain.Add(file)
-      else:
-        for subdir, dirs, files in os.walk(self.location):
-          for file in files:
-            if '.root' not in file: continue
-            self.ftpaths.append(os.path.join(subdir, file))
-            self.tchain.Add(os.path.join(subdir, file))
+      ## Load samples based on location type
+      self._loadFiles(location, file_limit)
+
+      if not self.ftpaths:
+          raise RuntimeError(f"No ROOT files found for sample {name} at {location}")
+
       self.rdf = r.RDataFrame(self.tchain)
 
       ## Set weight structure
       if not self.isData:
-        self.count = self.rdf.Sum('genWeight').GetValue() 
+        self.count = self.rdf.Sum('genWeight').GetValue()
       else:
         self.count = self.tchain.GetEntries()
 
@@ -52,21 +105,71 @@ class Sample:
         self.rdf = self.rdf.Define('lumWeight', str(self.xSection / self.count))
         self.rdf = self.rdf.Define('mcWeight', 'lumWeight * genWeight')
 
-      print("Loaded sample " + name + ' with a total of ' + str(self.count) + ' entries')
+      print(f"Loaded sample {name} with {len(self.ftpaths)} files and {self.count:.0f} entries")
+
+   def _loadFiles(self, location, file_limit=0):
+      """Load ROOT files from DAS dataset, xrootd, EOS, or local path."""
+
+      # Case 1: DAS dataset (e.g., /Muon0/Run2023C-PromptNanoAODv12-v1/NANOAOD)
+      if isDASDataset(location):
+          files = getCachedDASFiles(location)
+          if file_limit > 0:
+              files = files[:file_limit]
+          for f in files:
+              self.ftpaths.append(f)
+              self.tchain.Add(f)
+          return
+
+      # Case 2: XRootD URL or EOS path
+      if location.startswith('root://') or location.startswith('/eos/'):
+          if location.startswith('/eos/'):
+              # Convert EOS path to xrootd URL for remote access
+              location = "root://eoscms.cern.ch/" + location
+          if '*' in location:
+              # Glob pattern - requires local access
+              for f in glob.glob(location.replace('root://eoscms.cern.ch/', '')):
+                  if '.root' in f:
+                      xrd_path = "root://eoscms.cern.ch/" + f if not f.startswith('root://') else f
+                      self.ftpaths.append(xrd_path)
+                      self.tchain.Add(xrd_path)
+          else:
+              self.ftpaths.append(location)
+              self.tchain.Add(location)
+          return
+
+      # Case 3: Local directory or glob pattern
+      location = location if location[-1] == '/' else location + '/'
+      if '*' in location:
+          for f in glob.glob(location):
+              if '.root' in f:
+                  self.ftpaths.append(f)
+                  self.tchain.Add(f)
+      else:
+          for subdir, dirs, files in os.walk(location):
+              for f in files:
+                  if '.root' not in f:
+                      continue
+                  filepath = os.path.join(subdir, f)
+                  self.ftpaths.append(filepath)
+                  self.tchain.Add(filepath)
+                  if file_limit > 0 and len(self.ftpaths) >= file_limit:
+                      return
 
    def printSample(self):
       print("#################################")
-      print("Sample Name: ", self.name)
-      print("Sample Location: ", self.location)
-      print("Sample XSection: ", self.xSection)
-      print("Sample IsData: ", self.isData)
-      print("Sample LumWeight: ", self.lumWeight)
+      print(f"Sample Name: {self.name}")
+      print(f"Sample Location: {self.location}")
+      print(f"Sample XSection: {self.xSection}")
+      print(f"Sample IsData: {self.isData}")
+      print(f"Sample Files: {len(self.ftpaths)}")
+      print(f"Sample Entries: {self.count:.0f}")
       print("#################################")
 
 
    def closeFiles(self):
-       for _file in self.ftfiles:
-              _file.Close()
+       # With RDataFrame, files are managed automatically
+       # This method is kept for backward compatibility
+       pass
 
 
    def getTH1F(self, lumi, name, var, nbin = 0, xmin = 0.0, xmax = 0.0, cut = 'true', options = '', xlabel = '', xaxis = []):
@@ -237,40 +340,45 @@ class Block:
 class Tree:
    'Common base class for a physics meaningful tree'
 
-   def __init__(self, fileName, name, isdata, close = False):
-      #print fileName
-      self.name  = name
+   def __init__(self, fileName, name, isdata, close=False, file_limit=0):
+      self.name = name
       self.isData = isdata
       self.blocks = []
-      self.parseFileName(fileName, close)
+      self.file_limit = file_limit
+      self.parseFileName(fileName, close, file_limit)
 
-   def parseFileName(self, fileName, close = False):
-      f = open(fileName)
+   def parseFileName(self, fileName, close=False, file_limit=0):
+      with open(fileName) as f:
+          lines = f.readlines()
 
-      for l in f.readlines():
-        if (l[0] == "#" or len(l) < 2):
+      for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'):
           continue
 
-        splitedLine = str.split(l)
-        block       = splitedLine[0]
-        theColor    = splitedLine[1]
-        name        = splitedLine[2]
-        label       = splitedLine[3]
-        flocation   = splitedLine[4]
-        xsection    = float(splitedLine[5])
-        isdata      = int(splitedLine[6])
+        splitedLine = line.split()
+        if len(splitedLine) < 7:
+          continue
+
+        block = splitedLine[0]
+        theColor = splitedLine[1]
+        name = splitedLine[2]
+        label = splitedLine[3]
+        flocation = splitedLine[4]
+        xsection = float(splitedLine[5])
+        isdata = int(splitedLine[6])
 
         color = 0
         plusposition = theColor.find("+")
-        if(plusposition == -1):
+        if plusposition == -1:
           color = eval(theColor)
         else:
           color = eval(theColor[0:plusposition])
-          color = color + int(theColor[plusposition+1:len(theColor)])
+          color = color + int(theColor[plusposition+1:])
 
-        sample = Sample(name, label, theColor, flocation, xsection, isdata)
-        coincidentBlock = [l for l in self.blocks if l.name == block]
-        if(coincidentBlock == []):
+        sample = Sample(name, label, theColor, flocation, xsection, isdata, file_limit)
+        coincidentBlock = [b for b in self.blocks if b.name == block]
+        if not coincidentBlock:
           newBlock = Block(block, label, color, isdata)
           newBlock.addSample(sample)
           self.addBlock(newBlock)
