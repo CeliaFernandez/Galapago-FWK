@@ -68,6 +68,78 @@ def isDASDataset(location):
     """Check if location is a DAS dataset path."""
     return location.startswith('/') and location.count('/') >= 3 and '/store/' not in location
 
+
+def parseColor(color_str):
+    """
+    Parse color from dat file format.
+
+    Supports:
+        - Hex strings: '#f18f01', '#FF0000'
+        - ROOT colors: 'r.kBlack', 'r.kBlue'
+        - ROOT TColor: 'r.TColor.GetColor('#f18f01')'
+
+    Returns:
+        str: Hex color string for matplotlib/mplhep
+    """
+    if not isinstance(color_str, str):
+        return color_str
+
+    color_str = color_str.strip().strip("'\"")
+
+    # Already a hex color
+    if color_str.startswith('#'):
+        return color_str
+
+    # ROOT color constants
+    root_colors = {
+        'r.kBlack': '#000000',
+        'r.kWhite': '#FFFFFF',
+        'r.kRed': '#FF0000',
+        'r.kGreen': '#00FF00',
+        'r.kBlue': '#0000FF',
+        'r.kYellow': '#FFFF00',
+        'r.kMagenta': '#FF00FF',
+        'r.kCyan': '#00FFFF',
+        'r.kOrange': '#FF8000',
+        'r.kGray': '#808080',
+    }
+
+    # Check for ROOT color constants (with +N modifiers)
+    base_color = color_str.split('+')[0]
+    if base_color in root_colors:
+        return root_colors[base_color]
+
+    # Try to extract hex from TColor.GetColor
+    if 'TColor.GetColor' in color_str:
+        import re
+        match = re.search(r"['\"]#([0-9a-fA-F]{6})['\"]", color_str)
+        if match:
+            return f'#{match.group(1)}'
+
+    # Fallback - try eval for backward compatibility
+    try:
+        result = eval(color_str)
+        # If result is a ROOT color index, convert to hex
+        if isinstance(result, int):
+            return _rootColorToHex(result)
+        return result
+    except:
+        return '#000000'  # Default to black
+
+
+def _rootColorToHex(color_index):
+    """Convert ROOT color index to hex string."""
+    try:
+        color = r.gROOT.GetColor(color_index)
+        if color:
+            rgb = (int(color.GetRed() * 255),
+                   int(color.GetGreen() * 255),
+                   int(color.GetBlue() * 255))
+            return f'#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}'
+    except:
+        pass
+    return '#000000'
+
 ########################################################################################
 ########################################################################################
 ################################### Sample Class #######################################
@@ -79,7 +151,7 @@ class Sample:
 
       self.name = name
       self.label = label
-      self.color = eval(color) if isinstance(color, str) else color
+      self.color = parseColor(color)
       self.location = location
       self.xSection = xsection
       self.isData = isdata
@@ -368,13 +440,8 @@ class Tree:
         xsection = float(splitedLine[5])
         isdata = int(splitedLine[6])
 
-        color = 0
-        plusposition = theColor.find("+")
-        if plusposition == -1:
-          color = eval(theColor)
-        else:
-          color = eval(theColor[0:plusposition])
-          color = color + int(theColor[plusposition+1:])
+        # Parse color to hex format
+        color = parseColor(theColor)
 
         sample = Sample(name, label, theColor, flocation, xsection, isdata, file_limit)
         coincidentBlock = [b for b in self.blocks if b.name == block]
