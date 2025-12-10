@@ -15,7 +15,7 @@ from typing import List, Optional, Union
 import dask_awkward as dak
 
 # Import auxiliary functions
-from auxiliar import computeDimuonMass
+from include.auxiliar import computeDimuonMass
 
 # XRootD redirector for CMS data access
 XROOTD_REDIRECTOR = "root://cms-xrd-global.cern.ch/"
