@@ -17,10 +17,10 @@ def main():
     # Create Data sample
     print("\nLoading Data sample...")
     data = Sample(
-        name='Muon0_Run2024I',
-        dataset='/Muon0/Run2024I-PromptNanoAODv12-v1/NANOAOD',
+        name='Muon_Run2022G_NanoAODv15',
+        dataset='/Muon/Run2022G-NanoAODv15-v1/NANOAOD',
         isdata=True,
-        file_limit=2,  # Use 2 files for testing
+        file_limit=1,  # Use 2 files for testing
         label='Data',
         color='#000000'
     )
@@ -29,10 +29,10 @@ def main():
     print("\nLoading MC sample...")
     mc = Sample(
         name='DYJetsToLL',
-        dataset='/DYJetsToLL_M-50/Run3Summer23-PromptNanoAODv12-v1/NANOAOD',
+        dataset='/DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v6/NANOAODSIM',
         isdata=False,
         xsection=6077.22,  # pb
-        file_limit=2,
+        file_limit=1,
         label='Drell-Yan',
         color='#f18f01'
     )
@@ -41,10 +41,10 @@ def main():
     print("\nApplying selections...")
 
     # Dimuon selection
-    data.addSelection('events.nMuon >= 2')
+    data.addSelection('ak.num(events.Muon) >= 2')
     data.addSelection('events.Muon.charge[:, 0] * events.Muon.charge[:, 1] < 0')  # Opposite charge
 
-    mc.addSelection('events.nMuon >= 2')
+    mc.addSelection('ak.num(events.Muon) >= 2')
     mc.addSelection('events.Muon.charge[:, 0] * events.Muon.charge[:, 1] < 0')
 
     # Print info

@@ -12,6 +12,7 @@ import subprocess
 import hashlib
 import os
 from typing import List, Optional, Union
+import dask_awkward as dak
 
 # XRootD redirector for CMS data access
 XROOTD_REDIRECTOR = "root://cms-xrd-global.cern.ch/"
@@ -138,6 +139,7 @@ class Sample:
         self.file_paths = getCachedDASFiles(self.dataset)
 
         if self.file_limit > 0:
+            print(f"> File limit set to {self.file_limit}")
             self.file_paths = self.file_paths[:self.file_limit]
 
         if not self.file_paths:
@@ -146,9 +148,10 @@ class Sample:
         # Load events
         all_events = []
         for fpath in self.file_paths:
+            print(f"> path: {fpath}")
             try:
                 events = NanoEventsFactory.from_root(
-                    fpath,
+                    {fpath: "Events"},
                     schemaclass=NanoAODSchema,
                 ).events()
                 all_events.append(events)
@@ -159,7 +162,7 @@ class Sample:
         # Concatenate
         if all_events:
             self.events = ak.concatenate(all_events, axis=0)
-            self.nevents = len(self.events)
+            self.nevents = dak.num(self.events, axis=0).compute()
         else:
             raise RuntimeError(f"Could not load any events for {self.name}")
 
@@ -167,7 +170,7 @@ class Sample:
         """Setup event weights."""
         if not self.isData:
             # MC: sum of genWeights for normalization
-            self.sum_genweight = float(ak.sum(self.events.genWeight))
+            self.sum_genweight = float(ak.sum(self.events.genWeight).compute())
             lum_weight = self.xSection / self.sum_genweight
 
             # Add weight fields
@@ -181,7 +184,7 @@ class Sample:
             self.sum_genweight = float(self.nevents)
             self.events = ak.with_field(
                 self.events,
-                ak.ones_like(self.events.event),
+                ak.zeros_like(self.events.event) + 1,
                 'eventWeight'
             )
 
@@ -211,6 +214,21 @@ class Sample:
             events = events[mask]
 
         return events
+
+    def addVariable(self, name: str, expression: str):
+        """
+        Define a new variable/column.
+        Args:
+            name: Name of the new variable
+            expression: Python expression to calculate it
+                       Examples:
+                       'np.sqrt(2 * events.Muon.pt[:, 0] * events.Muon.pt[:, 1] * ...)'
+                       Or use helper functions like computeDimuonMass()
+        """
+        # Evaluate expression and add to events
+        value = eval(expression, {'events': self.events, 'ak': ak, 'np': np})
+        self.events = ak.with_field(self.events, value, name)
+        return self
 
     def getHist(self, var: str, bins: int, range: tuple,
                 lumi: float = 1.0, weight: str = None) -> Hist:
@@ -249,7 +267,10 @@ class Sample:
         )
 
         # Fill
-        h.fill(ak.flatten(values), weight=ak.flatten(weights))
+        #h.fill(ak.flatten(values), weight=ak.flatten(weights))
+        values_computed = values.compute()
+        weights_computed = weights.compute()
+        h.fill(values_computed, weight=weights_computed)
 
         return h
 
@@ -314,15 +335,14 @@ class Sample:
         events = self._applySelections()
 
         if self.isData:
-            weights = ak.ones_like(events.event)
+            n_events = dak.num(self.events, axis=0).compute()
+            print(n_events)
+            return float(n_events), float(np.sqrt(n_events))
         else:
             weights = events.eventWeight * lumi
-
-        total = float(ak.sum(weights))
-        # Simple uncertainty: sqrt(sum of weights squared)
-        unc = float(np.sqrt(ak.sum(weights**2)))
-
-        return (total, unc)
+            total = float(ak.sum(weights).compute())
+            unc = float(np.sqrt(ak.sum(weights**2).compute()))
+            return total, unc
 
     def printInfo(self):
         """Print sample information."""
@@ -339,6 +359,26 @@ class Sample:
         for i, sel in enumerate(self.selections, 1):
             print(f"  {i}. {sel}")
         print("=" * 50)
+
+    #=================================
+    # Auxiliar variable definitions
+    #=================================
+    #
+    def computeDimuonMass():
+        """
+        Compute dimuon invariant mass from two leading muons.
+        Adds 'DiMuon_mass' field to events.
+        Uses 4-momentum: mass = sqrt((p1 + p2)^2)
+        """
+        # Get muon 4-vectors (using coffea vector operations)
+        mu1 = self.events.Muon[:, 0]
+        mu2 = self.events.Muon[:, 1]
+        # Calculate invariant mass using 4-vector addition
+        dimuon = mu1 + mu2
+        mass = dimuon.mass
+        # Add to events
+        self.events = ak.with_field(self.events, mass, 'DiMuon_mass')
+        return self
 
 
 ########################################################################################
