@@ -14,6 +14,9 @@ import os
 from typing import List, Optional, Union
 import dask_awkward as dak
 
+# Import auxiliary functions
+from auxiliar import computeDimuonMass
+
 # XRootD redirector for CMS data access
 XROOTD_REDIRECTOR = "root://cms-xrd-global.cern.ch/"
 
@@ -231,7 +234,7 @@ class Sample:
         return self
 
     def getHist(self, var: str, bins: int, range: tuple,
-                lumi: float = 1.0, weight: str = None) -> Hist:
+                lumi: float = 1.0, weight: str = None, normalize: bool = False) -> Hist:
         """
         Create 1D histogram.
 
@@ -241,6 +244,7 @@ class Sample:
             range: (min, max) tuple
             lumi: Integrated luminosity in fb^-1
             weight: Optional weight expression (default: eventWeight * lumi)
+            normalize: If True, normalize histogram to unity (default: False)
 
         Returns:
             hist.Hist object
@@ -272,12 +276,18 @@ class Sample:
         weights_computed = weights.compute()
         h.fill(values_computed, weight=weights_computed)
 
+        # Normalize to unity if requested
+        if normalize:
+            integral = h.sum().value
+            if integral > 0:
+                h = h / integral
+
         return h
 
     def getHist2D(self, varx: str, vary: str,
                   binsx: int, rangex: tuple,
                   binsy: int, rangey: tuple,
-                  lumi: float = 1.0) -> Hist:
+                  lumi: float = 1.0, normalize: bool = False) -> Hist:
         """
         Create 2D histogram.
 
@@ -289,6 +299,7 @@ class Sample:
             binsy: Number of Y bins
             rangey: (ymin, ymax)
             lumi: Integrated luminosity in fb^-1
+            normalize: If True, normalize histogram to unity (default: False)
 
         Returns:
             hist.Hist object (2D)
@@ -319,6 +330,12 @@ class Sample:
             ak.flatten(yvalues),
             weight=ak.flatten(weights)
         )
+
+        # Normalize to unity if requested
+        if normalize:
+            integral = h.sum().value
+            if integral > 0:
+                h = h / integral
 
         return h
 
@@ -363,22 +380,11 @@ class Sample:
     #=================================
     # Auxiliar variable definitions
     #=================================
-    #
-    def computeDimuonMass():
-        """
-        Compute dimuon invariant mass from two leading muons.
-        Adds 'DiMuon_mass' field to events.
-        Uses 4-momentum: mass = sqrt((p1 + p2)^2)
-        """
-        # Get muon 4-vectors (using coffea vector operations)
-        mu1 = self.events.Muon[:, 0]
-        mu2 = self.events.Muon[:, 1]
-        # Calculate invariant mass using 4-vector addition
-        dimuon = mu1 + mu2
-        mass = dimuon.mass
-        # Add to events
-        self.events = ak.with_field(self.events, mass, 'DiMuon_mass')
-        return self
+    # (imported from auxiliar.py and attached below)
+
+
+# Attach auxiliary methods to Sample class
+Sample.computeDimuonMass = computeDimuonMass
 
 
 ########################################################################################
@@ -388,7 +394,8 @@ class Sample:
 def plotComparison(h_data: Hist, h_mc: Hist,
                    xlabel: str, ylabel: str = 'Events',
                    data_label: str = 'Data', mc_label: str = 'MC',
-                   output: str = 'plot.png', ratio: bool = True):
+                   output: str = 'plot.png', ratio: bool = True,
+                   normalized: bool = False, log_scale: bool = None):
     """
     Plot data/MC comparison using mplhep.
 
@@ -401,11 +408,21 @@ def plotComparison(h_data: Hist, h_mc: Hist,
         mc_label: Label for MC
         output: Output filename
         ratio: Show ratio panel
+        normalized: If True, assumes histograms are normalized to unity
+        log_scale: Use log scale for y-axis (default: True if not normalized, False if normalized)
     """
     import matplotlib.pyplot as plt
     import mplhep as hep
 
     plt.style.use(hep.style.CMS)
+
+    # Set default log scale based on normalization
+    if log_scale is None:
+        log_scale = not normalized
+
+    # Adjust ylabel for normalized plots
+    if normalized and ylabel == 'Events':
+        ylabel = 'Normalized to Unity'
 
     if ratio:
         fig, (ax, rax) = plt.subplots(
@@ -423,7 +440,8 @@ def plotComparison(h_data: Hist, h_mc: Hist,
 
     ax.set_ylabel(ylabel, fontsize=14)
     ax.legend(fontsize=12)
-    ax.set_yscale('log')
+    if log_scale:
+        ax.set_yscale('log')
 
     if ratio:
         ax.set_xlabel('')

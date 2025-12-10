@@ -51,6 +51,11 @@ def main():
     data.printInfo()
     mc.printInfo()
 
+    # Compute dimuon mass using auxiliar function
+    print("\nComputing dimuon invariant mass...")
+    data.computeDimuonMass()
+    mc.computeDimuonMass()
+
     # Get yields
     print("\nYields after selections:")
     data_yield, data_unc = data.getYield(lumi)
@@ -61,33 +66,64 @@ def main():
     # Create histograms
     print("\nCreating dimuon mass histograms...")
 
-    # Note: You'll need to define DiMuon_mass if it's not already in the events
-    # For now, using Muon_pt as an example
+    # Dimuon invariant mass (Z peak region)
     h_data = data.getHist(
-        var='events.Muon.pt[:, 0]',  # Leading muon pT
+        var='events.DiMuon_mass',
         bins=100,
-        range=(0, 200),
+        range=(60, 120),
         lumi=lumi
     )
 
     h_mc = mc.getHist(
-        var='events.Muon.pt[:, 0]',
+        var='events.DiMuon_mass',
         bins=100,
-        range=(0, 200),
+        range=(60, 120),
         lumi=lumi
     )
 
-    # Plot comparison
+    # Plot comparison (absolute yields)
     print("\nCreating comparison plot...")
     plotComparison(
         h_data=h_data,
         h_mc=h_mc,
-        xlabel='Leading Muon $p_T$ [GeV]',
-        ylabel='Events / 2 GeV',
+        xlabel='Dimuon Invariant Mass $m_{\\mu\\mu}$ [GeV]',
+        ylabel='Events / 0.6 GeV',
         data_label='Data 2024',
         mc_label='DY $\\rightarrow \\mu\\mu$',
-        output='plots/coffea_muon_pt.png',
+        output='plots/coffea_dimuon_mass.png',
         ratio=True
+    )
+
+    # Create normalized histograms for shape comparison
+    print("\nCreating normalized histograms...")
+    h_data_norm = data.getHist(
+        var='events.DiMuon_mass',
+        bins=100,
+        range=(60, 120),
+        lumi=lumi,
+        normalize=True
+    )
+
+    h_mc_norm = mc.getHist(
+        var='events.DiMuon_mass',
+        bins=100,
+        range=(60, 120),
+        lumi=lumi,
+        normalize=True
+    )
+
+    # Plot normalized comparison
+    print("\nCreating normalized comparison plot...")
+    plotComparison(
+        h_data=h_data_norm,
+        h_mc=h_mc_norm,
+        xlabel='Dimuon Invariant Mass $m_{\\mu\\mu}$ [GeV]',
+        ylabel='Normalized to Unity',
+        data_label='Data 2024',
+        mc_label='DY $\\rightarrow \\mu\\mu$',
+        output='plots/coffea_dimuon_mass_normalized.png',
+        ratio=True,
+        normalized=True
     )
 
     print("\n" + "=" * 60)
