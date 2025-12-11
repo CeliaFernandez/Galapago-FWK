@@ -153,9 +153,11 @@ class Sample:
         for fpath in self.file_paths:
             print(f"> path: {fpath}")
             try:
+                # Load events and compute immediately to avoid lazy evaluation issues
                 events = NanoEventsFactory.from_root(
                     {fpath: "Events"},
                     schemaclass=NanoAODSchema,
+                    delayed=False  # Load eagerly, not lazily
                 ).events()
                 all_events.append(events)
             except Exception as e:
@@ -165,7 +167,7 @@ class Sample:
         # Concatenate
         if all_events:
             self.events = ak.concatenate(all_events, axis=0)
-            self.nevents = dak.num(self.events, axis=0).compute()
+            self.nevents = len(self.events)
         else:
             raise RuntimeError(f"Could not load any events for {self.name}")
 
@@ -173,7 +175,7 @@ class Sample:
         """Setup event weights."""
         if not self.isData:
             # MC: sum of genWeights for normalization
-            self.sum_genweight = float(ak.sum(self.events.genWeight).compute())
+            self.sum_genweight = float(ak.sum(self.events.genWeight))
             lum_weight = self.xSection / self.sum_genweight
 
             # Add weight fields
@@ -271,10 +273,7 @@ class Sample:
         )
 
         # Fill
-        #h.fill(ak.flatten(values), weight=ak.flatten(weights))
-        values_computed = values.compute()
-        weights_computed = weights.compute()
-        h.fill(values_computed, weight=weights_computed)
+        h.fill(values, weight=weights)
 
         # Normalize to unity if requested
         if normalize:
@@ -352,13 +351,12 @@ class Sample:
         events = self._applySelections()
 
         if self.isData:
-            n_events = dak.num(self.events, axis=0).compute()
-            print(n_events)
+            n_events = len(events)
             return float(n_events), float(np.sqrt(n_events))
         else:
             weights = events.eventWeight * lumi
-            total = float(ak.sum(weights).compute())
-            unc = float(np.sqrt(ak.sum(weights**2).compute()))
+            total = float(ak.sum(weights))
+            unc = float(np.sqrt(ak.sum(weights**2)))
             return total, unc
 
     def printInfo(self):
